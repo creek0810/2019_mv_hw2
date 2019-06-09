@@ -53,13 +53,13 @@ def main():
 
 def calc_projection(camera_parameters, corners):
     # find homography
-    corners_3d = np.array([[
+    ori_corners = np.array([[
                 [0, 0],
                 [200, 0],
                 [200, 200],
                 [0, 200]
             ]])
-    T, mask = cv2.findHomography(corners_3d, corners[0], cv2.RANSAC)
+    T, mask = cv2.findHomography(ori_corners, corners[0], cv2.RANSAC)
     # calc real external matrix
     T = T * (-1)
     external = np.dot(np.linalg.inv(camera_parameters), T)
