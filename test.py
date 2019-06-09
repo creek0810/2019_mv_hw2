@@ -1,9 +1,3 @@
-
-# Useful links
-# http://www.pygame.org/wiki/OBJFileLoader
-# https://rdmilligan.wordpress.com/2015/10/15/augmented-reality-using-opencv-opengl-and-blender/
-# https://clara.io/library
-
 import cv2.aruco as aruco
 
 import cv2
@@ -13,14 +7,12 @@ from objloader_simple import *
 
 
 def main():
-    """
-    This functions loads the target surface image,
-    """
-    # matrix of camera parameters (made up but works quite well for me) 
-    camera_parameters = np.array([[1.08355894e+03, 0.00000000e+00, 5.73362291e+02],
-     [0.00000000e+00, 1.08500947e+03, 3.45074914e+02],
-     [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]])
-    # Load 3D model from OBJ file
+    camera_parameters = np.array([
+        [1.08355894e+03, 0.00000000e+00, 5.73362291e+02],
+        [0.00000000e+00, 1.08500947e+03, 3.45074914e+02],
+        [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]
+    ])
+    # load obj
     obj = OBJ("./dog.obj", swapyz=True)
     cap = cv2.VideoCapture(0)
     # aruco var
@@ -35,18 +27,9 @@ def main():
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         corners, ids, rejectedImgPoints = aruco.detectMarkers(gray, aruco_dict, parameters=parameters)
 
-        # compute Homography if enough matches are found
         if len(corners) >= 1:
-            corners_3d = np.array([[
-                [0, 0],
-                [200, 0],
-                [200, 200],
-                [0, 200]
-            ]])
-            T, mask = cv2.findHomography(corners_3d, corners[0], cv2.RANSAC)
-            projection = calc_projection(camera_parameters, T)
-            
-
+            # get projection matrix
+            projection = calc_projection(camera_parameters, corners[0])
             # draw aruco marker bound
             frame = aruco.drawDetectedMarkers(frame, corners)
             # render 3d model
@@ -61,35 +44,16 @@ def main():
     cv2.destroyAllWindows()
     return 0
 
-def render(img, obj, projection, model, color=False):
-    """
-    Render a loaded obj model into the current video frame
-    """
-    vertices = obj.vertices
-    scale_matrix = np.eye(3) * 15
-    h = 200
-    w = 200
-
-    for face in obj.faces:
-        print("render")
-        face_vertices = face[0]
-        points = np.array([vertices[vertex - 1] for vertex in face_vertices])
-        points = np.dot(points, scale_matrix)
-        # render model in the middle of the reference surface. To do so,
-        # model points must be displaced
-        points = np.array([[p[0] + w / 2, p[1] + h / 2, p[2]] for p in points])
-        dst = cv2.perspectiveTransform(points.reshape(-1, 1, 3), projection)
-        imgpts = np.int32(dst)
-        cv2.fillConvexPoly(img, imgpts, (137, 27, 211))
-        
-    return img
-
-def calc_projection(camera_parameters, T):
-    """
-    From the camera calibration matrix and the estimated T
-    compute the 3D projection matrix
-    """
-    # Compute rotation along the x and y axis as well as the translation
+def calc_projection(camera_parameters, corners):
+    # find homography
+    corners_3d = np.array([[
+                [0, 0],
+                [200, 0],
+                [200, 200],
+                [0, 200]
+            ]])
+    T, mask = cv2.findHomography(corners_3d, corners[0], cv2.RANSAC)
+    # calc real external matrix
     T = T * (-1)
     external = np.dot(np.linalg.inv(camera_parameters), T)
     # calc external matrix and transpose
@@ -113,6 +77,28 @@ def calc_projection(camera_parameters, T):
     projection = np.column_stack((rot_1, rot_2, rot_3, translation))
 
     return np.dot(camera_parameters, projection)
+
+def render(img, obj, projection, model, color=False):
+    """
+    Render a loaded obj model into the current video frame
+    """
+    vertices = obj.vertices
+    scale_matrix = np.eye(3) * 15
+    h = 200
+    w = 200
+
+    for face in obj.faces:
+        face_vertices = face[0]
+        points = np.array([vertices[vertex - 1] for vertex in face_vertices])
+        points = np.dot(points, scale_matrix)
+        # render in the middle
+        points = np.array([[p[0] + w / 2, p[1] + h / 2, p[2]] for p in points])
+        dst = cv2.perspectiveTransform(points.reshape(-1, 1, 3), projection)
+        imgpts = np.int32(dst)
+        cv2.fillConvexPoly(img, imgpts, (137, 27, 211))
+        
+    return img
+
 
 
 if __name__ == '__main__':
