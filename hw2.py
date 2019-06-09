@@ -5,13 +5,17 @@ import numpy as np
 import math
 from objloader_simple import *
 
-
 def main():
     camera_parameters = np.array([
         [1.08355894e+03, 0.00000000e+00, 5.73362291e+02],
         [0.00000000e+00, 1.08500947e+03, 3.45074914e+02],
         [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]
     ])
+    cap = cv2.VideoCapture(0)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    out = cv2.VideoWriter('output.avi',cv2.VideoWriter_fourcc('M','J','P','G'), 4, (width,height))
+
     # load obj
     obj = OBJ("./dog.obj", swapyz=True)
     cap = cv2.VideoCapture(0)
@@ -35,12 +39,15 @@ def main():
             # render 3d model
             frame = render(frame, obj, projection, False)
 
-        # show result    
+        # show result
+        frame = cv2.resize(frame, (width, height)) 
         cv2.imshow("frame", frame)
+        out.write(frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
     cap.release()
+    out.release()
     cv2.destroyAllWindows()
     return 0
 
@@ -83,7 +90,7 @@ def render(img, obj, projection, model, color=False):
     Render a loaded obj model into the current video frame
     """
     vertices = obj.vertices
-    scale_matrix = np.eye(3) * 15
+    scale_matrix = np.eye(3) * 20
     h = 200
     w = 200
 
